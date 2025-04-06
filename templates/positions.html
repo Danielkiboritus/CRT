@@ -1,0 +1,216 @@
+{% extends "layout.html" %}
+
+{% block title %}Open Positions{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-list-check"></i> Open Positions
+                <span class="badge bg-primary float-end">{{ open_positions|length }}</span>
+            </div>
+            <div class="card-body">
+                {% if open_positions %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Ticket</th>
+                                <th>Symbol</th>
+                                <th>Type</th>
+                                <th>Volume</th>
+                                <th>Open Price</th>
+                                <th>Current Price</th>
+                                <th>SL</th>
+                                <th>TP</th>
+                                <th>Swap</th>
+                                <th>Profit</th>
+                                <th>Time</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for position in open_positions %}
+                            <tr>
+                                <td>{{ position.ticket }}</td>
+                                <td>{{ position.symbol }}</td>
+                                <td>
+                                    <span class="badge {% if position.type == 0 %}bg-success{% else %}bg-danger{% endif %}">
+                                        {{ position.type_str }}
+                                    </span>
+                                </td>
+                                <td>{{ position.volume }}</td>
+                                <td>{{ position.price_open }}</td>
+                                <td>{{ position.price_current }}</td>
+                                <td>{{ position.sl }}</td>
+                                <td>{{ position.tp }}</td>
+                                <td>{{ position.swap|round(2) }}</td>
+                                <td class="{% if position.profit > 0 %}profit{% elif position.profit < 0 %}loss{% endif %}">
+                                    {{ position.profit|round(2) }}
+                                </td>
+                                <td>{{ position.time }}</td>
+                                <td>
+                                    <button class="btn btn-danger btn-sm close-position" data-ticket="{{ position.ticket }}">
+                                        Close
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info">No open positions</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-wallet2"></i> Account Summary
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5>Balance</h5>
+                        <h3>{{ account_info.balance|round(2) }} {{ account_info.currency }}</h3>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>Equity</h5>
+                        <h3>{{ account_info.equity|round(2) }} {{ account_info.currency }}</h3>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <h5>Profit</h5>
+                        <h3 class="{% if account_info.profit > 0 %}profit{% elif account_info.profit < 0 %}loss{% endif %}">
+                            {{ account_info.profit|round(2) }} {{ account_info.currency }}
+                        </h3>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>Margin Level</h5>
+                        <h3>{{ account_info.margin_level|round(2) }}%</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-pie-chart"></i> Position Distribution
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <canvas id="positionTypeChart" class="chart-container"></canvas>
+                    </div>
+                    <div class="col-md-6">
+                        <canvas id="positionSymbolChart" class="chart-container"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Close position
+        document.querySelectorAll('.close-position').forEach(button => {
+            button.addEventListener('click', function() {
+                const ticket = this.getAttribute('data-ticket');
+                if (confirm(`Are you sure you want to close position #${ticket}?`)) {
+                    const formData = new FormData();
+                    formData.append('ticket', ticket);
+                    
+                    fetch('/api/close_position', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        alert(data.message);
+                        if (data.success) {
+                            location.reload();
+                        }
+                    });
+                }
+            });
+        });
+
+        // Position Type Chart
+        const positionTypeCtx = document.getElementById('positionTypeChart').getContext('2d');
+        const positionTypeData = {
+            labels: ['Buy', 'Sell'],
+            datasets: [{
+                data: [
+                    {{ open_positions|selectattr('type', 'eq', 0)|list|length }},
+                    {{ open_positions|selectattr('type', 'eq', 1)|list|length }}
+                ],
+                backgroundColor: ['#28a745', '#dc3545'],
+                hoverBackgroundColor: ['#218838', '#c82333']
+            }]
+        };
+        new Chart(positionTypeCtx, {
+            type: 'pie',
+            data: positionTypeData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    },
+                    title: {
+                        display: true,
+                        text: 'Position Types'
+                    }
+                }
+            }
+        });
+
+        // Position Symbol Chart
+        const positionSymbolCtx = document.getElementById('positionSymbolChart').getContext('2d');
+        const symbols = [...new Set({{ open_positions|map(attribute='symbol')|list|tojson }})];
+        const symbolCounts = symbols.map(symbol => {
+            return {{ open_positions|tojson }}.filter(pos => pos.symbol === symbol).length;
+        });
+        const positionSymbolData = {
+            labels: symbols,
+            datasets: [{
+                data: symbolCounts,
+                backgroundColor: [
+                    '#007bff', '#28a745', '#dc3545', '#ffc107', '#17a2b8',
+                    '#6610f2', '#fd7e14', '#20c997', '#e83e8c', '#6c757d'
+                ]
+            }]
+        };
+        new Chart(positionSymbolCtx, {
+            type: 'pie',
+            data: positionSymbolData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    },
+                    title: {
+                        display: true,
+                        text: 'Position Symbols'
+                    }
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}

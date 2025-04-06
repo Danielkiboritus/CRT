@@ -1,0 +1,272 @@
+{% extends "layout.html" %}
+
+{% block title %}Trade History{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-graph-up"></i> Performance Metrics
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <h5>Total Trades</h5>
+                                <h2>{{ performance_metrics.total_trades or 0 }}</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <h5>Win Rate</h5>
+                                <h2>{{ ((performance_metrics.win_rate or 0) * 100)|round(2) }}%</h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <h5>Total Profit</h5>
+                                <h2 class="{% if (performance_metrics.total_profit or 0) > 0 %}profit{% elif (performance_metrics.total_profit or 0) < 0 %}loss{% endif %}">
+                                    {{ (performance_metrics.total_profit or 0)|round(2) }} {{ account_info.currency }}
+                                </h2>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card">
+                            <div class="card-body text-center">
+                                <h5>Profit Factor</h5>
+                                <h2>{{ (performance_metrics.profit_factor or 0)|round(2) }}</h2>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-pie-chart"></i> Performance Charts
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <canvas id="winLossChart" class="chart-container"></canvas>
+                    </div>
+                    <div class="col-md-6">
+                        <canvas id="symbolPerformanceChart" class="chart-container"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-bar-chart"></i> Profit/Loss Distribution
+            </div>
+            <div class="card-body">
+                <canvas id="profitDistributionChart" class="chart-container"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-clock-history"></i> Trade History
+                <span class="badge bg-primary float-end">{{ trade_history|length }}</span>
+            </div>
+            <div class="card-body">
+                {% if trade_history %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Deal</th>
+                                <th>Symbol</th>
+                                <th>Type</th>
+                                <th>Entry/Exit</th>
+                                <th>Volume</th>
+                                <th>Price</th>
+                                <th>Profit</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for deal in trade_history %}
+                            <tr>
+                                <td>{{ deal.deal }}</td>
+                                <td>{{ deal.symbol }}</td>
+                                <td>
+                                    <span class="badge {% if deal.type == 0 %}bg-success{% else %}bg-danger{% endif %}">
+                                        {{ deal.type_str }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="badge {% if deal.entry == 1 %}bg-info{% else %}bg-warning{% endif %}">
+                                        {{ deal.entry_str }}
+                                    </span>
+                                </td>
+                                <td>{{ deal.volume }}</td>
+                                <td>{{ deal.price }}</td>
+                                <td class="{% if deal.profit > 0 %}profit{% elif deal.profit < 0 %}loss{% endif %}">
+                                    {{ deal.profit|round(2) }}
+                                </td>
+                                <td>{{ deal.time }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info">No trade history</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Win/Loss Chart
+        const winLossCtx = document.getElementById('winLossChart').getContext('2d');
+        const winLossData = {
+            labels: ['Win', 'Loss'],
+            datasets: [{
+                data: [
+                    {{ performance_metrics.profitable_trades or 0 }},
+                    {{ performance_metrics.losing_trades or 0 }}
+                ],
+                backgroundColor: ['#28a745', '#dc3545'],
+                hoverBackgroundColor: ['#218838', '#c82333']
+            }]
+        };
+        new Chart(winLossCtx, {
+            type: 'pie',
+            data: winLossData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    },
+                    title: {
+                        display: true,
+                        text: 'Win/Loss Ratio'
+                    }
+                }
+            }
+        });
+
+        // Symbol Performance Chart
+        const symbolPerformanceCtx = document.getElementById('symbolPerformanceChart').getContext('2d');
+        {% if performance_metrics.symbol_metrics %}
+        const symbols = Object.keys({{ performance_metrics.symbol_metrics|tojson }});
+        const symbolProfits = symbols.map(symbol => {
+            return {{ performance_metrics.symbol_metrics|tojson }}[symbol].total_profit;
+        });
+        const symbolPerformanceData = {
+            labels: symbols,
+            datasets: [{
+                data: symbolProfits,
+                backgroundColor: [
+                    '#007bff', '#28a745', '#dc3545', '#ffc107', '#17a2b8',
+                    '#6610f2', '#fd7e14', '#20c997', '#e83e8c', '#6c757d'
+                ]
+            }]
+        };
+        new Chart(symbolPerformanceCtx, {
+            type: 'pie',
+            data: symbolPerformanceData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom'
+                    },
+                    title: {
+                        display: true,
+                        text: 'Profit by Symbol'
+                    }
+                }
+            }
+        });
+        {% endif %}
+
+        // Profit Distribution Chart
+        const profitDistributionCtx = document.getElementById('profitDistributionChart').getContext('2d');
+        {% if trade_history %}
+        const profits = {{ trade_history|selectattr('entry', 'eq', 0)|map(attribute='profit')|list|tojson }};
+        
+        // Create bins for profit distribution
+        const binSize = 10;
+        const bins = {};
+        profits.forEach(profit => {
+            const binIndex = Math.floor(profit / binSize) * binSize;
+            bins[binIndex] = (bins[binIndex] || 0) + 1;
+        });
+        
+        const binLabels = Object.keys(bins).sort((a, b) => parseInt(a) - parseInt(b));
+        const binCounts = binLabels.map(label => bins[label]);
+        
+        const profitDistributionData = {
+            labels: binLabels.map(label => `${label} to ${parseInt(label) + binSize}`),
+            datasets: [{
+                label: 'Number of Trades',
+                data: binCounts,
+                backgroundColor: binLabels.map(label => parseInt(label) >= 0 ? '#28a745' : '#dc3545'),
+                borderColor: binLabels.map(label => parseInt(label) >= 0 ? '#218838' : '#c82333'),
+                borderWidth: 1
+            }]
+        };
+        
+        new Chart(profitDistributionCtx, {
+            type: 'bar',
+            data: profitDistributionData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: 'Number of Trades'
+                        }
+                    },
+                    x: {
+                        title: {
+                            display: true,
+                            text: 'Profit Range'
+                        }
+                    }
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'Profit Distribution'
+                    }
+                }
+            }
+        });
+        {% endif %}
+    });
+</script>
+{% endblock %}

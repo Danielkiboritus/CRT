@@ -1,0 +1,388 @@
+{% extends "layout.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Account Summary Card -->
+    <div class="col-md-6">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-primary text-white">
+                <i class="bi bi-wallet2"></i> Account Summary
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="me-3">
+                                <i class="bi bi-cash-stack fs-3 text-success"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-0 text-muted">Balance</h6>
+                                <h4 class="mb-0">{{ account_info.balance|round(2) }} {{ account_info.currency }}</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="me-3">
+                                <i class="bi bi-bar-chart-fill fs-3 text-primary"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-0 text-muted">Equity</h6>
+                                <h4 class="mb-0">{{ account_info.equity|round(2) }} {{ account_info.currency }}</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="me-3">
+                                <i class="bi bi-graph-up-arrow fs-3 {% if account_info.profit > 0 %}text-success{% elif account_info.profit < 0 %}text-danger{% else %}text-secondary{% endif %}"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-0 text-muted">Profit</h6>
+                                <h4 class="mb-0 {% if account_info.profit > 0 %}profit{% elif account_info.profit < 0 %}loss{% endif %}">
+                                    {{ account_info.profit|round(2) }} {{ account_info.currency }}
+                                </h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="me-3">
+                                <i class="bi bi-percent fs-3 text-info"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-0 text-muted">Margin Level</h6>
+                                <h4 class="mb-0">{{ account_info.margin_level|round(2) }}%</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <div class="progress equity-progress">
+                            <div class="progress-bar bg-success equity-bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="Equity progress"></div>
+                        </div>
+                        <div class="d-flex justify-content-between mt-1">
+                            <small class="text-muted">Account: {{ account_info.login }}</small>
+                            <small class="text-muted">Server: {{ account_info.server }}</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Performance Summary Card -->
+    <div class="col-md-6">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-success text-white">
+                <i class="bi bi-graph-up"></i> Performance Summary
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="me-3">
+                                <i class="bi bi-list-check fs-3 text-primary"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-0 text-muted">Total Trades</h6>
+                                <h4 class="mb-0">{{ performance_metrics.total_trades or 0 }}</h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="me-3">
+                                <i class="bi bi-trophy fs-3 text-warning"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-0 text-muted">Win Rate</h6>
+                                <h4 class="mb-0">{{ ((performance_metrics.win_rate or 0) * 100)|round(2) }}%</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="me-3">
+                                <i class="bi bi-currency-dollar fs-3 {% if (performance_metrics.total_profit or 0) > 0 %}text-success{% elif (performance_metrics.total_profit or 0) < 0 %}text-danger{% else %}text-secondary{% endif %}"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-0 text-muted">Total Profit</h6>
+                                <h4 class="mb-0 {% if (performance_metrics.total_profit or 0) > 0 %}profit{% elif (performance_metrics.total_profit or 0) < 0 %}loss{% endif %}">
+                                    {{ (performance_metrics.total_profit or 0)|round(2) }} {{ account_info.currency }}
+                                </h4>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="me-3">
+                                <i class="bi bi-calculator fs-3 text-info"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-0 text-muted">Profit Factor</h6>
+                                <h4 class="mb-0">{{ (performance_metrics.profit_factor or 0)|round(2) }}</h4>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <div class="d-flex justify-content-between">
+                            <div class="text-center">
+                                <span class="badge bg-success rounded-pill">{{ performance_metrics.profitable_trades or 0 }}</span>
+                                <small class="d-block text-muted mt-1">Winning</small>
+                            </div>
+                            <div class="text-center">
+                                <span class="badge bg-danger rounded-pill">{{ performance_metrics.losing_trades or 0 }}</span>
+                                <small class="d-block text-muted mt-1">Losing</small>
+                            </div>
+                            <div class="text-center">
+                                <span class="badge bg-primary rounded-pill">{{ (performance_metrics.avg_profit or 0)|round(2) }}</span>
+                                <small class="d-block text-muted mt-1">Avg Win</small>
+                            </div>
+                            <div class="text-center">
+                                <span class="badge bg-secondary rounded-pill">{{ (performance_metrics.avg_loss or 0)|round(2) }}</span>
+                                <small class="d-block text-muted mt-1">Avg Loss</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Open Positions Card -->
+    <div class="col-md-12">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="bi bi-list-check"></i> Open Positions
+                    <span class="badge bg-light text-dark ms-2">{{ open_positions|length }}</span>
+                </div>
+                <a href="/positions" class="btn btn-sm btn-light">View All</a>
+            </div>
+            <div class="card-body p-0">
+                {% if open_positions %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Type</th>
+                                <th>Volume</th>
+                                <th>Open Price</th>
+                                <th>Current Price</th>
+                                <th>Profit</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for position in open_positions[:5] %}
+                            <tr>
+                                <td><span class="badge bg-secondary">{{ position.symbol }}</span></td>
+                                <td>
+                                    <span class="badge {% if position.type == 0 %}bg-success{% else %}bg-danger{% endif %}">
+                                        {{ position.type_str }}
+                                    </span>
+                                </td>
+                                <td>{{ position.volume }}</td>
+                                <td>{{ position.price_open }}</td>
+                                <td>{{ position.price_current }}</td>
+                                <td class="{% if position.profit > 0 %}profit{% elif position.profit < 0 %}loss{% endif %}">
+                                    {{ position.profit|round(2) }} {{ account_info.currency }}
+                                </td>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-danger close-position-btn" data-ticket="{{ position.ticket }}">
+                                        <i class="bi bi-x-circle"></i> Close
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            {% if open_positions|length > 5 %}
+                            <tr>
+                                <td colspan="7" class="text-center">
+                                    <a href="/positions" class="btn btn-sm btn-outline-primary">
+                                        View {{ open_positions|length - 5 }} more positions
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="bi bi-info-circle text-muted fs-1"></i>
+                    <p class="text-muted mt-2">No open positions</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Trading Symbols Card -->
+    <div class="col-md-12">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                <div>
+                    <i class="bi bi-currency-exchange"></i> Trading Symbols
+                    <span class="badge bg-light text-dark ms-2">{{ selected_symbols|length }}</span>
+                </div>
+                <a href="/symbols" class="btn btn-sm btn-light">Manage Symbols</a>
+            </div>
+            <div class="card-body p-0">
+                {% if selected_symbols %}
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Status</th>
+                                <th>Last Run</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for symbol in selected_symbols %}
+                            <tr>
+                                <td><span class="badge bg-secondary">{{ symbol }}</span></td>
+                                <td>
+                                    {% if symbol in running_agents and running_agents[symbol]['running'] %}
+                                    <span class="badge bg-success">Running</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">Stopped</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if symbol in running_agents and running_agents[symbol]['last_run'] %}
+                                    {{ running_agents[symbol]['last_run'].strftime('%Y-%m-%d %H:%M:%S') }}
+                                    {% else %}
+                                    Never
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if symbol in running_agents and running_agents[symbol]['running'] %}
+                                    <button type="button" class="btn btn-sm btn-warning stop-agent-btn" data-symbol="{{ symbol }}">
+                                        <i class="bi bi-stop-circle"></i> Stop
+                                    </button>
+                                    {% else %}
+                                    <button type="button" class="btn btn-sm btn-success start-agent-btn" data-symbol="{{ symbol }}">
+                                        <i class="bi bi-play-circle"></i> Start
+                                    </button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-4">
+                    <i class="bi bi-info-circle text-muted fs-1"></i>
+                    <p class="text-muted mt-2">No symbols selected for trading</p>
+                    <a href="/symbols" class="btn btn-primary">
+                        <i class="bi bi-plus-circle"></i> Add Symbols
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Update equity progress bar
+        const equityBar = document.querySelector('.equity-bar');
+        if (equityBar) {
+            const equityPercent = {{ (account_info.equity / account_info.balance * 100) if account_info.balance > 0 else 0 }};
+            equityBar.style.width = equityPercent + '%';
+            equityBar.setAttribute('aria-valuenow', equityPercent);
+        }
+        // Close position buttons
+        document.querySelectorAll('.close-position-btn').forEach(function(button) {
+            button.addEventListener('click', function() {
+                const ticket = this.getAttribute('data-ticket');
+                if (confirm('Are you sure you want to close this position?')) {
+                    const formData = new FormData();
+                    formData.append('ticket', ticket);
+
+                    fetch('/api/close_position', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert(data.message);
+                            location.reload();
+                        } else {
+                            alert('Error: ' + data.message);
+                        }
+                    });
+                }
+            });
+        });
+
+        // Start agent buttons
+        document.querySelectorAll('.start-agent-btn').forEach(function(button) {
+            button.addEventListener('click', function() {
+                const symbol = this.getAttribute('data-symbol');
+                const formData = new FormData();
+                formData.append('symbol', symbol);
+
+                fetch('/api/start_agent', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message);
+                        location.reload();
+                    } else {
+                        alert('Error: ' + data.message);
+                    }
+                });
+            });
+        });
+
+        // Stop agent buttons
+        document.querySelectorAll('.stop-agent-btn').forEach(function(button) {
+            button.addEventListener('click', function() {
+                const symbol = this.getAttribute('data-symbol');
+                const formData = new FormData();
+                formData.append('symbol', symbol);
+
+                fetch('/api/stop_agent', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message);
+                        location.reload();
+                    } else {
+                        alert('Error: ' + data.message);
+                    }
+                });
+            });
+        });
+    });
+</script>
+{% endblock %}

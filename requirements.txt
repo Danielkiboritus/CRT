@@ -1,0 +1,22 @@
+# Required Python libraries for the CRT Trading Agent
+
+# Core dependencies
+MetaTrader5>=5.0.40    # Python package for MetaTrader 5 API integration
+pandas>=1.5.0          # For data manipulation (DataFrames) and analysis
+pytz>=2023.3           # For handling timezones accurately
+numpy>=1.21.0          # Fundamental package for numerical computing
+
+# Dashboard dependencies
+flask>=2.3.0           # Web framework for the dashboard
+matplotlib>=3.7.0      # For generating charts and visualizations
+
+# AI integration
+anthropic>=0.5.0       # For Claude AI integration
+termcolor>=2.3.0       # For colored terminal output
+python-dotenv>=1.0.0   # For loading environment variables
+
+# Notes:
+# - You can install these packages using: pip install -r requirements.txt
+# - The version specifiers (>=) indicate the minimum recommended versions.
+# - For exact reproducibility, you can generate this file from your working
+#   virtual environment using: pip freeze > requirements.txt

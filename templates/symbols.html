@@ -1,0 +1,258 @@
+{% extends "layout.html" %}
+
+{% block title %}Symbol Selection{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-currency-exchange"></i> Symbol Selection
+                <span class="badge bg-primary float-end">{{ selected_symbols|length }} selected</span>
+            </div>
+            <div class="card-body">
+                <p>Select the symbols you want to trade with the CRT agent. Selected symbols will appear on the dashboard.</p>
+                
+                <ul class="nav nav-tabs" id="symbolTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="forex-tab" data-bs-toggle="tab" data-bs-target="#forex" type="button" role="tab" aria-controls="forex" aria-selected="true">
+                            Forex
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="indices-tab" data-bs-toggle="tab" data-bs-target="#indices" type="button" role="tab" aria-controls="indices" aria-selected="false">
+                            Indices
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="commodities-tab" data-bs-toggle="tab" data-bs-target="#commodities" type="button" role="tab" aria-controls="commodities" aria-selected="false">
+                            Commodities
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="crypto-tab" data-bs-toggle="tab" data-bs-target="#crypto" type="button" role="tab" aria-controls="crypto" aria-selected="false">
+                            Crypto
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="synthetic-tab" data-bs-toggle="tab" data-bs-target="#synthetic" type="button" role="tab" aria-controls="synthetic" aria-selected="false">
+                            Synthetic
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="other-tab" data-bs-toggle="tab" data-bs-target="#other" type="button" role="tab" aria-controls="other" aria-selected="false">
+                            Other
+                        </button>
+                    </li>
+                </ul>
+                
+                <div class="tab-content mt-3" id="symbolTabContent">
+                    <!-- Forex -->
+                    <div class="tab-pane fade show active" id="forex" role="tabpanel" aria-labelledby="forex-tab">
+                        <div class="symbol-list">
+                            {% for symbol in available_symbols.forex %}
+                            <div class="symbol-item">
+                                <span>{{ symbol }}</span>
+                                <button class="btn btn-sm {% if symbol in selected_symbols %}btn-danger deselect-symbol{% else %}btn-primary select-symbol{% endif %}" data-symbol="{{ symbol }}">
+                                    {% if symbol in selected_symbols %}Deselect{% else %}Select{% endif %}
+                                </button>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    
+                    <!-- Indices -->
+                    <div class="tab-pane fade" id="indices" role="tabpanel" aria-labelledby="indices-tab">
+                        <div class="symbol-list">
+                            {% for symbol in available_symbols.indices %}
+                            <div class="symbol-item">
+                                <span>{{ symbol }}</span>
+                                <button class="btn btn-sm {% if symbol in selected_symbols %}btn-danger deselect-symbol{% else %}btn-primary select-symbol{% endif %}" data-symbol="{{ symbol }}">
+                                    {% if symbol in selected_symbols %}Deselect{% else %}Select{% endif %}
+                                </button>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    
+                    <!-- Commodities -->
+                    <div class="tab-pane fade" id="commodities" role="tabpanel" aria-labelledby="commodities-tab">
+                        <div class="symbol-list">
+                            {% for symbol in available_symbols.commodities %}
+                            <div class="symbol-item">
+                                <span>{{ symbol }}</span>
+                                <button class="btn btn-sm {% if symbol in selected_symbols %}btn-danger deselect-symbol{% else %}btn-primary select-symbol{% endif %}" data-symbol="{{ symbol }}">
+                                    {% if symbol in selected_symbols %}Deselect{% else %}Select{% endif %}
+                                </button>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    
+                    <!-- Crypto -->
+                    <div class="tab-pane fade" id="crypto" role="tabpanel" aria-labelledby="crypto-tab">
+                        <div class="symbol-list">
+                            {% for symbol in available_symbols.crypto %}
+                            <div class="symbol-item">
+                                <span>{{ symbol }}</span>
+                                <button class="btn btn-sm {% if symbol in selected_symbols %}btn-danger deselect-symbol{% else %}btn-primary select-symbol{% endif %}" data-symbol="{{ symbol }}">
+                                    {% if symbol in selected_symbols %}Deselect{% else %}Select{% endif %}
+                                </button>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    
+                    <!-- Synthetic -->
+                    <div class="tab-pane fade" id="synthetic" role="tabpanel" aria-labelledby="synthetic-tab">
+                        <div class="symbol-list">
+                            {% for symbol in available_symbols.synthetic %}
+                            <div class="symbol-item">
+                                <span>{{ symbol }}</span>
+                                <button class="btn btn-sm {% if symbol in selected_symbols %}btn-danger deselect-symbol{% else %}btn-primary select-symbol{% endif %}" data-symbol="{{ symbol }}">
+                                    {% if symbol in selected_symbols %}Deselect{% else %}Select{% endif %}
+                                </button>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    
+                    <!-- Other -->
+                    <div class="tab-pane fade" id="other" role="tabpanel" aria-labelledby="other-tab">
+                        <div class="symbol-list">
+                            {% for symbol in available_symbols.other %}
+                            <div class="symbol-item">
+                                <span>{{ symbol }}</span>
+                                <button class="btn btn-sm {% if symbol in selected_symbols %}btn-danger deselect-symbol{% else %}btn-primary select-symbol{% endif %}" data-symbol="{{ symbol }}">
+                                    {% if symbol in selected_symbols %}Deselect{% else %}Select{% endif %}
+                                </button>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-check2-square"></i> Selected Symbols
+            </div>
+            <div class="card-body">
+                {% if selected_symbols %}
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for symbol in selected_symbols %}
+                            <tr>
+                                <td>{{ symbol }}</td>
+                                <td>
+                                    <button class="btn btn-primary btn-sm start-agent" data-symbol="{{ symbol }}">
+                                        Start Agent
+                                    </button>
+                                    <button class="btn btn-danger btn-sm deselect-symbol" data-symbol="{{ symbol }}">
+                                        Deselect
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info">No symbols selected</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Select symbol
+        document.querySelectorAll('.select-symbol').forEach(button => {
+            button.addEventListener('click', function() {
+                const symbol = this.getAttribute('data-symbol');
+                const formData = new FormData();
+                formData.append('symbol', symbol);
+                
+                fetch('/api/select_symbol', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        this.classList.remove('btn-primary', 'select-symbol');
+                        this.classList.add('btn-danger', 'deselect-symbol');
+                        this.textContent = 'Deselect';
+                        location.reload();
+                    } else {
+                        alert(data.message);
+                    }
+                });
+            });
+        });
+
+        // Deselect symbol
+        document.querySelectorAll('.deselect-symbol').forEach(button => {
+            button.addEventListener('click', function() {
+                const symbol = this.getAttribute('data-symbol');
+                const formData = new FormData();
+                formData.append('symbol', symbol);
+                
+                fetch('/api/deselect_symbol', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        this.classList.remove('btn-danger', 'deselect-symbol');
+                        this.classList.add('btn-primary', 'select-symbol');
+                        this.textContent = 'Select';
+                        location.reload();
+                    } else {
+                        alert(data.message);
+                    }
+                });
+            });
+        });
+
+        // Start agent
+        document.querySelectorAll('.start-agent').forEach(button => {
+            button.addEventListener('click', function() {
+                const symbol = this.getAttribute('data-symbol');
+                if (confirm(`Are you sure you want to start an agent for ${symbol}?`)) {
+                    const formData = new FormData();
+                    formData.append('symbol', symbol);
+                    
+                    fetch('/api/start_agent', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        alert(data.message);
+                        if (data.success) {
+                            location.href = '/';
+                        }
+                    });
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}

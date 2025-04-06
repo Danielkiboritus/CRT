@@ -1,0 +1,141 @@
+{% extends "layout.html" %}
+
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-gear"></i> Trading Settings
+            </div>
+            <div class="card-body">
+                <form id="settingsForm">
+                    <div class="mb-3">
+                        <label for="riskPercent" class="form-label">Risk Percent</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" id="riskPercent" name="risk_percent" value="{{ config.RISK_PERCENT }}" step="0.1" min="0.1" max="5">
+                            <span class="input-group-text">%</span>
+                        </div>
+                        <div class="form-text">Percentage of account balance to risk per trade.</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="maxTrades" class="form-label">Maximum Trades</label>
+                        <input type="number" class="form-control" id="maxTrades" name="max_trades" value="{{ config.MAX_TRADES }}" min="1" max="10">
+                        <div class="form-text">Maximum number of concurrent trades per symbol.</div>
+                    </div>
+                    
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="backtestMode" name="backtest_mode" {% if config.BACKTEST_MODE %}checked{% endif %}>
+                        <label class="form-check-label" for="backtestMode">Backtest Mode</label>
+                        <div class="form-text">When enabled, no actual trades will be placed.</div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Save Settings</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-info-circle"></i> Account Information
+            </div>
+            <div class="card-body">
+                <table class="table">
+                    <tbody>
+                        <tr>
+                            <th>Login</th>
+                            <td>{{ account_info.login }}</td>
+                        </tr>
+                        <tr>
+                            <th>Server</th>
+                            <td>{{ account_info.server }}</td>
+                        </tr>
+                        <tr>
+                            <th>Balance</th>
+                            <td>{{ account_info.balance|round(2) }} {{ account_info.currency }}</td>
+                        </tr>
+                        <tr>
+                            <th>Equity</th>
+                            <td>{{ account_info.equity|round(2) }} {{ account_info.currency }}</td>
+                        </tr>
+                        <tr>
+                            <th>Margin</th>
+                            <td>{{ account_info.margin|round(2) }} {{ account_info.currency }}</td>
+                        </tr>
+                        <tr>
+                            <th>Free Margin</th>
+                            <td>{{ account_info.margin_free|round(2) }} {{ account_info.currency }}</td>
+                        </tr>
+                        <tr>
+                            <th>Margin Level</th>
+                            <td>{{ account_info.margin_level|round(2) }}%</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div class="card mt-4">
+            <div class="card-header">
+                <i class="bi bi-clock"></i> Timeframe Settings
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">Higher Timeframe</label>
+                    <select class="form-select" disabled>
+                        <option value="16408" {% if config.HIGHER_TIMEFRAME == 16408 %}selected{% endif %}>H4</option>
+                        <option value="16385" {% if config.HIGHER_TIMEFRAME == 16385 %}selected{% endif %}>H1</option>
+                        <option value="16392" {% if config.HIGHER_TIMEFRAME == 16392 %}selected{% endif %}>D1</option>
+                    </select>
+                    <div class="form-text">Timeframe for CRT pattern identification.</div>
+                </div>
+                
+                <div class="mb-3">
+                    <label class="form-label">Lower Timeframe</label>
+                    <select class="form-select" disabled>
+                        <option value="16390" {% if config.LOWER_TIMEFRAME == 16390 %}selected{% endif %}>M15</option>
+                        <option value="16386" {% if config.LOWER_TIMEFRAME == 16386 %}selected{% endif %}>M5</option>
+                        <option value="16385" {% if config.LOWER_TIMEFRAME == 16385 %}selected{% endif %}>M1</option>
+                    </select>
+                    <div class="form-text">Timeframe for entry refinement.</div>
+                </div>
+                
+                <div class="alert alert-info">
+                    Timeframe settings can only be changed in the config.py file.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Settings form
+        document.getElementById('settingsForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            formData.append('backtest_mode', document.getElementById('backtestMode').checked);
+            
+            fetch('/api/update_settings', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Settings updated successfully');
+                } else {
+                    alert('Failed to update settings: ' + data.message);
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}

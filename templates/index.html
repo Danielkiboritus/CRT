@@ -1,0 +1,361 @@
+{% extends "layout.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Account Summary -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-wallet2"></i> Account Summary
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5>Balance</h5>
+                        <h3>{{ account_info.balance|round(2) }} {{ account_info.currency }}</h3>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>Equity</h5>
+                        <h3>{{ account_info.equity|round(2) }} {{ account_info.currency }}</h3>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <h5>Profit</h5>
+                        <h3 class="{% if account_info.profit > 0 %}profit{% elif account_info.profit < 0 %}loss{% endif %}">
+                            {{ account_info.profit|round(2) }} {{ account_info.currency }}
+                        </h3>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>Margin Level</h5>
+                        <h3>{{ account_info.margin_level|round(2) }}%</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Performance Summary -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-graph-up"></i> Performance Summary
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h5>Total Trades</h5>
+                        <h3>{{ performance_metrics.total_trades or 0 }}</h3>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>Win Rate</h5>
+                        <h3>{{ ((performance_metrics.win_rate or 0) * 100)|round(2) }}%</h3>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-md-6">
+                        <h5>Total Profit</h5>
+                        <h3 class="{% if (performance_metrics.total_profit or 0) > 0 %}profit{% elif (performance_metrics.total_profit or 0) < 0 %}loss{% endif %}">
+                            {{ (performance_metrics.total_profit or 0)|round(2) }} {{ account_info.currency }}
+                        </h3>
+                    </div>
+                    <div class="col-md-6">
+                        <h5>Profit Factor</h5>
+                        <h3>{{ (performance_metrics.profit_factor or 0)|round(2) }}</h3>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <!-- Open Positions -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-list-check"></i> Open Positions
+                <span class="badge bg-primary float-end">{{ open_positions|length }}</span>
+            </div>
+            <div class="card-body">
+                {% if open_positions %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-sm">
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Type</th>
+                                <th>Volume</th>
+                                <th>Open Price</th>
+                                <th>Profit</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for position in open_positions %}
+                            <tr>
+                                <td>{{ position.symbol }}</td>
+                                <td>
+                                    <span class="badge {% if position.type == 0 %}bg-success{% else %}bg-danger{% endif %}">
+                                        {{ position.type_str }}
+                                    </span>
+                                </td>
+                                <td>{{ position.volume }}</td>
+                                <td>{{ position.price_open }}</td>
+                                <td class="{% if position.profit > 0 %}profit{% elif position.profit < 0 %}loss{% endif %}">
+                                    {{ position.profit|round(2) }}
+                                </td>
+                                <td>
+                                    <button class="btn btn-danger btn-sm close-position" data-ticket="{{ position.ticket }}">
+                                        Close
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info">No open positions</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Running Agents -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-robot"></i> Running Agents
+                <span class="badge bg-primary float-end">{{ running_agents|length }}</span>
+            </div>
+            <div class="card-body">
+                {% if running_agents %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-sm">
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Status</th>
+                                <th>Start Time</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for symbol, agent in running_agents.items() %}
+                            <tr>
+                                <td>{{ symbol }}</td>
+                                <td>
+                                    <span class="badge {% if agent.status == 'running' %}bg-success{% else %}bg-warning{% endif %}">
+                                        {{ agent.status }}
+                                    </span>
+                                </td>
+                                <td>{{ agent.start_time }}</td>
+                                <td>
+                                    <button class="btn btn-danger btn-sm stop-agent" data-symbol="{{ symbol }}">
+                                        Stop
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info">No running agents</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <!-- Selected Symbols -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-currency-exchange"></i> Selected Symbols
+                <span class="badge bg-primary float-end">{{ selected_symbols|length }}</span>
+            </div>
+            <div class="card-body">
+                {% if selected_symbols %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-sm">
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for symbol in selected_symbols %}
+                            <tr>
+                                <td>{{ symbol }}</td>
+                                <td>
+                                    <button class="btn btn-primary btn-sm start-agent" data-symbol="{{ symbol }}">
+                                        Start Agent
+                                    </button>
+                                    <button class="btn btn-danger btn-sm deselect-symbol" data-symbol="{{ symbol }}">
+                                        Deselect
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info">No symbols selected. Go to the Symbols page to select symbols for trading.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Trades -->
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-clock-history"></i> Recent Trades
+            </div>
+            <div class="card-body">
+                {% if trade_history %}
+                <div class="table-responsive">
+                    <table class="table table-striped table-sm">
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Type</th>
+                                <th>Volume</th>
+                                <th>Price</th>
+                                <th>Profit</th>
+                                <th>Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for deal in trade_history[:5] %}
+                            <tr>
+                                <td>{{ deal.symbol }}</td>
+                                <td>
+                                    <span class="badge {% if deal.type == 0 %}bg-success{% else %}bg-danger{% endif %}">
+                                        {{ deal.type_str }}
+                                    </span>
+                                </td>
+                                <td>{{ deal.volume }}</td>
+                                <td>{{ deal.price }}</td>
+                                <td class="{% if deal.profit > 0 %}profit{% elif deal.profit < 0 %}loss{% endif %}">
+                                    {{ deal.profit|round(2) }}
+                                </td>
+                                <td>{{ deal.time }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-info">No trade history</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Close position
+        document.querySelectorAll('.close-position').forEach(button => {
+            button.addEventListener('click', function() {
+                const ticket = this.getAttribute('data-ticket');
+                if (confirm(`Are you sure you want to close position #${ticket}?`)) {
+                    const formData = new FormData();
+                    formData.append('ticket', ticket);
+                    
+                    fetch('/api/close_position', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        alert(data.message);
+                        if (data.success) {
+                            location.reload();
+                        }
+                    });
+                }
+            });
+        });
+
+        // Start agent
+        document.querySelectorAll('.start-agent').forEach(button => {
+            button.addEventListener('click', function() {
+                const symbol = this.getAttribute('data-symbol');
+                if (confirm(`Are you sure you want to start an agent for ${symbol}?`)) {
+                    const formData = new FormData();
+                    formData.append('symbol', symbol);
+                    
+                    fetch('/api/start_agent', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        alert(data.message);
+                        if (data.success) {
+                            location.reload();
+                        }
+                    });
+                }
+            });
+        });
+
+        // Stop agent
+        document.querySelectorAll('.stop-agent').forEach(button => {
+            button.addEventListener('click', function() {
+                const symbol = this.getAttribute('data-symbol');
+                if (confirm(`Are you sure you want to stop the agent for ${symbol}?`)) {
+                    const formData = new FormData();
+                    formData.append('symbol', symbol);
+                    
+                    fetch('/api/stop_agent', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        alert(data.message);
+                        if (data.success) {
+                            location.reload();
+                        }
+                    });
+                }
+            });
+        });
+
+        // Deselect symbol
+        document.querySelectorAll('.deselect-symbol').forEach(button => {
+            button.addEventListener('click', function() {
+                const symbol = this.getAttribute('data-symbol');
+                if (confirm(`Are you sure you want to deselect ${symbol}?`)) {
+                    const formData = new FormData();
+                    formData.append('symbol', symbol);
+                    
+                    fetch('/api/deselect_symbol', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        alert(data.message);
+                        if (data.success) {
+                            location.reload();
+                        }
+                    });
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}

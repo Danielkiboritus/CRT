@@ -1,0 +1,1158 @@
+Based on all the video; https://www.youtube.com/watch?v=O7TMSwPaARk&t=1255s, this text prvides a comprehensive guide to creating a Python MT5 trading agent using CRT (Candle Range Theory) and ICT (Inner Circle Trader) Smart Money Concepts.
+
+# Building a Python MT5 Trading Agent with CRT/ICT Smart Money Concepts
+
+## Overview
+
+The trading agent you're looking to create will implement the Candle Range Theory (CRT) strategy within the ICT (Inner Circle Trader) Smart Money Concepts framework using MetaTrader 5 (MT5) and Python. This agent will identify potential trading opportunities by detecting specific candlestick patterns that indicate liquidity manipulation and potential market reversals.
+
+## What is CRT?
+
+Based on the video you referenced and our research, the Candle Range Theory is a trading strategy focusing on a specific 3-candle sequence pattern:
+
+1. **Range Candle**: Forms the initial range with defined high and low boundaries
+2. **Manipulation Candle**: Breaks either above or below the range candle's boundaries to purge liquidity
+3. **Distribution Candle**: Moves in the direction opposite to the manipulation, toward the opposing end of the range
+
+CRT works particularly well when combined with ICT concepts like market structure analysis, liquidity identification, and order blocks.
+
+## Core Components of Your Trading Agent
+
+### 1. MetaTrader 5 Connection and Data Retrieval
+
+```python
+import MetaTrader5 as mt5
+import pandas as pd
+from datetime import datetime
+import time
+
+def initialize_mt5(username=None, password=None, server=None):
+    """Initialize connection to MT5 terminal."""
+    if not mt5.initialize():
+        print(f"initialize() failed, error code = {mt5.last_error()}")
+        return False
+    
+    # Login if credentials are provided
+    if username and password and server:
+        authorized = mt5.login(username, password, server)
+        if not authorized:
+            print(f"Login failed, error code: {mt5.last_error()}")
+            mt5.shutdown()
+            return False
+    
+    # Display connection status
+    print(f"MetaTrader5 package version: {mt5.__version__}")
+    print(f"Connected to account: {mt5.account_info().login}")
+    
+    return True
+
+def get_ohlc_data(symbol, timeframe, count=500):
+    """Retrieve OHLC data for the specified symbol and timeframe."""
+    try:
+        rates = mt5.copy_rates_from_pos(symbol, timeframe, 0, count)
+        if rates is None or len(rates) == 0:
+            print(f"Failed to get rates for {symbol} on {timeframe}: {mt5.last_error()}")
+            return None
+        
+        # Convert to pandas DataFrame for easier analysis
+        df = pd.DataFrame(rates)
+        df['time'] = pd.to_datetime(df['time'], unit='s')
+        df.set_index('time', inplace=True)
+        
+        return df
+    except Exception as e:
+        print(f"Error getting OHLC data: {e}")
+        return None
+```
+
+### 2. CRT Pattern Detection
+
+```python
+def find_crt_patterns(df_high_tf, df_low_tf, key_levels=None):
+    """
+    Identify potential CRT patterns in the data.
+    
+    Parameters:
+    - df_high_tf: DataFrame with higher timeframe data
+    - df_low_tf: DataFrame with lower timeframe data for entry
+    - key_levels: List of key price levels to consider
+    
+    Returns:
+    - List of identified CRT patterns
+    """
+    patterns = []
+    
+    # Reset index for easier access
+    df = df_high_tf.reset_index()
+    
+    # Minimum number of candles to look back
+    min_lookback = 3
+    
+    if len(df) < min_lookback:
+        return patterns
+    
+    # Iterate through candles (excluding the most recent and earliest few)
+    for i in range(min_lookback, len(df)-1):
+        # Check for bullish CRT pattern
+        if df.iloc[i-1]['low'] < df.iloc[i-2]['low'] and df.iloc[i-1]['close'] >= df.iloc[i-2]['low']:
+            # Range candle
+            range_candle = df.iloc[i-2]
+            # Manipulation candle (turtlesoup below the range)
+            manipulation_candle = df.iloc[i-1]
+            # Distribution candle
+            distribution_candle = df.iloc[i]
+            
+            # If manipulation candle closed inside the range, higher probability
+            high_probability = manipulation_candle['close'] > range_candle['low']
+            
+            # Check if near key level if provided
+            near_key_level = False
+            if key_levels is not None:
+                for level in key_levels:
+                    if abs(manipulation_candle['low'] - level) / level < 0.0015:  # Within 0.15%
+                        near_key_level = True
+                        break
+            
+            # Record the pattern
+            patterns.append({
+                'type': 'bullish',
+                'range_candle_idx': i-2,
+                'manipulation_candle_idx': i-1,
+                'distribution_candle_idx': i,
+                'entry_price': manipulation_candle['low'],
+                'stop_loss': manipulation_candle['low'] - (range_candle['high'] - range_candle['low']) * 0.1,
+                'take_profit': range_candle['high'],
+                'high_probability': high_probability,
+                'near_key_level': near_key_level,
+                'time': df.iloc[i-1]['time']
+            })
+        
+        # Check for bearish CRT pattern
+        if df.iloc[i-1]['high'] > df.iloc[i-2]['high'] and df.iloc[i-1]['close'] <= df.iloc[i-2]['high']:
+            # Range candle
+            range_candle = df.iloc[i-2]
+            # Manipulation candle (turtlesoup above the range)
+            manipulation_candle = df.iloc[i-1]
+            # Distribution candle
+            distribution_candle = df.iloc[i]
+            
+            # If manipulation candle closed inside the range, higher probability
+            high_probability = manipulation_candle['close'] < range_candle['high']
+            
+            # Check if near key level if provided
+            near_key_level = False
+            if key_levels is not None:
+                for level in key_levels:
+                    if abs(manipulation_candle['high'] - level) / level < 0.0015:  # Within 0.15%
+                        near_key_level = True
+                        break
+            
+            # Record the pattern
+            patterns.append({
+                'type': 'bearish',
+                'range_candle_idx': i-2,
+                'manipulation_candle_idx': i-1,
+                'distribution_candle_idx': i,
+                'entry_price': manipulation_candle['high'],
+                'stop_loss': manipulation_candle['high'] + (range_candle['high'] - range_candle['low']) * 0.1,
+                'take_profit': range_candle['low'],
+                'high_probability': high_probability,
+                'near_key_level': near_key_level,
+                'time': df.iloc[i-1]['time']
+            })
+    
+    return patterns
+```
+
+### 3. Market Structure Analysis for Confirmation
+
+```python
+def analyze_market_structure(df):
+    """
+    Analyze market structure to identify trends, swings, and potential reversals.
+    
+    Parameters:
+    - df: DataFrame with OHLC data
+    
+    Returns:
+    - Dictionary with market structure analysis
+    """
+    df = df.copy()
+    
+    # Find swing highs and lows
+    df['swing_high'] = False
+    df['swing_low'] = False
+    
+    # Simple swing detection (can be more sophisticated)
+    for i in range(2, len(df)-2):
+        # Swing high
+        if (df.iloc[i]['high'] > df.iloc[i-1]['high'] and 
+            df.iloc[i]['high'] > df.iloc[i-2]['high'] and
+            df.iloc[i]['high'] > df.iloc[i+1]['high'] and
+            df.iloc[i]['high'] > df.iloc[i+2]['high']):
+            df.loc[df.index[i], 'swing_high'] = True
+        
+        # Swing low
+        if (df.iloc[i]['low'] < df.iloc[i-1]['low'] and 
+            df.iloc[i]['low'] < df.iloc[i-2]['low'] and
+            df.iloc[i]['low'] < df.iloc[i+1]['low'] and
+            df.iloc[i]['low'] < df.iloc[i+2]['low']):
+            df.loc[df.index[i], 'swing_low'] = True
+    
+    # Identify bullish and bearish structure
+    swing_highs = df[df['swing_high']].index
+    swing_lows = df[df['swing_low']].index
+    
+    # Identify market structure
+    structure = {
+        'swing_highs': list(zip(swing_highs, df.loc[swing_highs, 'high'])),
+        'swing_lows': list(zip(swing_lows, df.loc[swing_lows, 'low'])),
+        'current_structure': 'unknown'
+    }
+    
+    # Determine higher highs, higher lows, lower highs, lower lows
+    if len(swing_highs) >= 2 and len(swing_lows) >= 2:
+        recent_highs = df.loc[swing_highs, 'high'][-2:].values
+        recent_lows = df.loc[swing_lows, 'low'][-2:].values
+        
+        if recent_highs[1] > recent_highs[0] and recent_lows[1] > recent_lows[0]:
+            structure['current_structure'] = 'bullish'
+        elif recent_highs[1] < recent_highs[0] and recent_lows[1] < recent_lows[0]:
+            structure['current_structure'] = 'bearish'
+        elif recent_highs[1] < recent_highs[0] and recent_lows[1] > recent_lows[0]:
+            structure['current_structure'] = 'consolidating'
+    
+    return structure
+```
+
+### 4. Order Execution
+
+```python
+def calculate_lot_size(symbol, risk_amount, sl_distance):
+    """
+    Calculate appropriate lot size based on risk parameters.
+    
+    Parameters:
+    - symbol: Trading symbol
+    - risk_amount: Amount to risk in account currency
+    - sl_distance: Stop loss distance in pips/points
+    
+    Returns:
+    - Calculated lot size
+    """
+    try:
+        # Get symbol info
+        symbol_info = mt5.symbol_info(symbol)
+        if symbol_info is None:
+            print(f"Symbol {symbol} not found")
+            return 0.01  # Default minimum
+        
+        # Calculate tick value
+        tick_size = symbol_info.trade_tick_size
+        tick_value = symbol_info.trade_tick_value
+        
+        # Calculate points per pip (usually 10 for 5-digit brokers)
+        points_per_pip = 10 if symbol_info.digits == 5 or symbol_info.digits == 3 else 1
+        
+        # Convert SL distance from pips to points
+        sl_points = sl_distance * points_per_pip
+        
+        # Calculate value per pip
+        pip_value = tick_value * points_per_pip / tick_size
+        
+        # Calculate lot size
+        lot_size = risk_amount / (sl_points * pip_value)
+        
+        # Round to broker's lot step
+        lot_step = symbol_info.volume_step
+        lot_size = round(lot_size / lot_step) * lot_step
+        
+        # Ensure lot size is within allowed range
+        if lot_size < symbol_info.volume_min:
+            lot_size = symbol_info.volume_min
+        elif lot_size > symbol_info.volume_max:
+            lot_size = symbol_info.volume_max
+        
+        return lot_size
+    
+    except Exception as e:
+        print(f"Error calculating lot size: {e}")
+        return 0.01  # Default minimum
+```
+
+```python
+def place_order(symbol, order_type, lot_size, entry_price, sl_price, tp_price, deviation=20, comment="CRT Trade"):
+    """
+    Place an order with the specified parameters.
+    
+    Parameters:
+    - symbol: Trading symbol
+    - order_type: 'buy' or 'sell'
+    - lot_size: Order volume
+    - entry_price: Entry price level
+    - sl_price: Stop loss price
+    - tp_price: Take profit price
+    - deviation: Maximum price deviation in points
+    - comment: Order comment
+    
+    Returns:
+    - Order result dictionary
+    """
+    # Map order type to MT5 constants
+    order_types = {
+        'buy': mt5.ORDER_TYPE_BUY,
+        'sell': mt5.ORDER_TYPE_SELL,
+        'buy_limit': mt5.ORDER_TYPE_BUY_LIMIT,
+        'sell_limit': mt5.ORDER_TYPE_SELL_LIMIT,
+        'buy_stop': mt5.ORDER_TYPE_BUY_STOP,
+        'sell_stop': mt5.ORDER_TYPE_SELL_STOP
+    }
+    
+    if order_type not in order_types:
+        print(f"Invalid order type: {order_type}")
+        return None
+    
+    # Get symbol info
+    symbol_info = mt5.symbol_info(symbol)
+    if symbol_info is None:
+        print(f"Symbol {symbol} not found")
+        return None
+    
+    # Make sure symbol is visible and selected
+    if not symbol_info.visible:
+        mt5.symbol_select(symbol, True)
+    
+    # Prepare the request
+    request = {
+        "action": mt5.TRADE_ACTION_DEAL,
+        "symbol": symbol,
+        "volume": float(lot_size),
+        "type": order_types[order_type],
+        "price": entry_price,
+        "sl": sl_price,
+        "tp": tp_price,
+        "deviation": deviation,
+        "magic": 123456,  # Identifier for this trading agent
+        "comment": comment,
+        "type_time": mt5.ORDER_TIME_GTC,
+        "type_filling": mt5.ORDER_FILLING_IOC,
+    }
+    
+    # Send the order
+    result = mt5.order_send(request)
+    
+    # Check result
+    if result.retcode != mt5.TRADE_RETCODE_DONE:
+        print(f"Order placement failed: {result.retcode} - {result.comment}")
+        return None
+    
+    print(f"Order placed successfully: Order ID: {result.order}")
+    return result
+```
+
+### 5. Main Trading Loop
+
+```python
+def run_crt_trading_agent(
+    symbol, 
+    higher_tf, 
+    lower_tf, 
+    risk_percent=1.0, 
+    max_trades=5,
+    check_interval=60,  # in seconds
+    backtest_mode=False
+):
+    """
+    Main function to run the CRT trading agent.
+    
+    Parameters:
+    - symbol: Trading symbol
+    - higher_tf: Higher timeframe for CRT pattern identification
+    - lower_tf: Lower timeframe for entry timing
+    - risk_percent: Risk per trade as percentage of account balance
+    - max_trades: Maximum number of concurrent trades
+    - check_interval: Time between checks in seconds
+    - backtest_mode: Whether to run in backtest mode
+    """
+    try:
+        # Initialize MT5 connection
+        if not initialize_mt5():
+            return
+        
+        print(f"Starting CRT Trading Agent for {symbol}")
+        
+        # Main loop
+        while True:
+            try:
+                # Get account information
+                account_info = mt5.account_info()
+                if account_info is None:
+                    print("Failed to get account info")
+                    time.sleep(check_interval)
+                    continue
+                
+                balance = account_info.balance
+                print(f"Current balance: {balance}")
+                
+                # Calculate risk amount
+                risk_amount = balance * risk_percent / 100
+                
+                # Get open positions
+                positions = mt5.positions_get(symbol=symbol)
+                if positions is None:
+                    positions = []
+                
+                # Check if we already have max trades open
+                if len(positions) >= max_trades:
+                    print(f"Maximum number of trades ({max_trades}) already open")
+                    time.sleep(check_interval)
+                    continue
+                
+                # Get data
+                df_high_tf = get_ohlc_data(symbol, higher_tf, 100)
+                df_low_tf = get_ohlc_data(symbol, lower_tf, 100)
+                
+                if df_high_tf is None or df_low_tf is None:
+                    print("Failed to get data, retrying...")
+                    time.sleep(check_interval)
+                    continue
+                
+                # Find key levels
+                key_levels = find_key_levels(df_high_tf)
+                
+                # Analyze market structure
+                structure = analyze_market_structure(df_high_tf)
+                print(f"Current market structure: {structure['current_structure']}")
+                
+                # Find CRT patterns
+                patterns = find_crt_patterns(df_high_tf, df_low_tf, key_levels)
+                
+                if patterns:
+                    print(f"Found {len(patterns)} potential CRT patterns")
+                    
+                    # Filter to high probability patterns only
+                    high_prob_patterns = [p for p in patterns if p['high_probability'] and p['near_key_level']]
+                    
+                    if high_prob_patterns:
+                        print(f"Found {len(high_prob_patterns)} high probability patterns")
+                        
+                        # Take the most recent pattern
+                        pattern = high_prob_patterns[-1]
+                        
+                        # Calculate lot size
+                        if pattern['type'] == 'bullish':
+                            sl_distance = abs(pattern['entry_price'] - pattern['stop_loss']) * 10000  # Convert to pips
+                            lot_size = calculate_lot_size(symbol, risk_amount, sl_distance)
+                            order_type = 'buy'
+                        else:  # bearish
+                            sl_distance = abs(pattern['entry_price'] - pattern['stop_loss']) * 10000  # Convert to pips
+                            lot_size = calculate_lot_size(symbol, risk_amount, sl_distance)
+                            order_type = 'sell'
+                        
+                        print(f"Executing {pattern['type']} CRT trade:")
+                        print(f"Entry: {pattern['entry_price']}, SL: {pattern['stop_loss']}, TP: {pattern['take_profit']}")
+                        print(f"Risk: ${risk_amount}, Lot Size: {lot_size}")
+                        
+                        # Place the order
+                        if not backtest_mode:
+                            result = place_order(
+                                symbol=symbol,
+                                order_type=order_type,
+                                lot_size=lot_size,
+                                entry_price=pattern['entry_price'],
+                                sl_price=pattern['stop_loss'],
+                                tp_price=pattern['take_profit'],
+                                comment=f"CRT {pattern['type']}"
+                            )
+                            
+                            if result:
+                                print(f"Order placed successfully!")
+                        else:
+                            print("Backtest mode - Order would be placed here")
+                
+                # Wait before next check
+                if backtest_mode:
+                    break
+                
+                print(f"Waiting {check_interval} seconds for next check...")
+                time.sleep(check_interval)
+                
+            except KeyboardInterrupt:
+                print("User interrupted, exiting...")
+                break
+            except Exception as e:
+                print(f"Error in main loop: {e}")
+                time.sleep(check_interval)
+        
+        # Clean up and exit
+        mt5.shutdown()
+        print("MT5 connection closed")
+        
+    except Exception as e:
+        print(f"Fatal error: {e}")
+        mt5.shutdown()
+```
+
+### 6. Key Levels Identification
+
+```python
+def find_key_levels(df, n_levels=10):
+    """
+    Identify key price levels from the data.
+    
+    Parameters:
+    - df: DataFrame with OHLC data
+    - n_levels: Maximum number of levels to return
+    
+    Returns:
+    - List of key price levels
+    """
+    # Find swing highs and lows as potential key levels
+    levels = []
+    
+    # Swing highs and lows (simplified approach)
+    for i in range(2, len(df)-2):
+        # Swing high
+        if (df.iloc[i]['high'] > df.iloc[i-1]['high'] and 
+            df.iloc[i]['high'] > df.iloc[i-2]['high'] and
+            df.iloc[i]['high'] > df.iloc[i+1]['high'] and
+            df.iloc[i]['high'] > df.iloc[i+2]['high']):
+            levels.append(df.iloc[i]['high'])
+        
+        # Swing low
+        if (df.iloc[i]['low'] < df.iloc[i-1]['low'] and 
+            df.iloc[i]['low'] < df.iloc[i-2]['low'] and
+            df.iloc[i]['low'] < df.iloc[i+1]['low'] and
+            df.iloc[i]['low'] < df.iloc[i+2]['low']):
+            levels.append(df.iloc[i]['low'])
+    
+    # Add session high/lows (e.g., Asian session range)
+    # Assuming df has a datetime index
+    df_copy = df.copy().reset_index()
+    
+    # Convert to datetime if not already
+    if not pd.api.types.is_datetime64_any_dtype(df_copy['time']):
+        df_copy['time'] = pd.to_datetime(df_copy['time'])
+    
+    # Asian session range (approximate)
+    asian_session = df_copy[(df_copy['time'].dt.hour >= 0) & (df_copy['time'].dt.hour < 8)]
+    if not asian_session.empty:
+        levels.append(asian_session['high'].max())
+        levels.append(asian_session['low'].min())
+    
+    # London session range (approximate)
+    london_session = df_copy[(df_copy['time'].dt.hour >= 8) & (df_copy['time'].dt.hour < 16)]
+    if not london_session.empty:
+        levels.append(london_session['high'].max())
+        levels.append(london_session['low'].min())
+    
+    # New York session range (approximate)
+    ny_session = df_copy[(df_copy['time'].dt.hour >= 13) & (df_copy['time'].dt.hour < 21)]
+    if not ny_session.empty:
+        levels.append(ny_session['high'].max())
+        levels.append(ny_session['low'].min())
+    
+    # Round to 5 decimal places for FX pairs
+    levels = [round(level, 5) for level in levels]
+    
+    # Remove duplicates
+    levels = list(set(levels))
+    
+    # Sort levels
+    levels.sort()
+    
+    # Simplify by grouping nearby levels
+    if len(levels) > 1:
+        simplified_levels = [levels[0]]
+        
+        for level in levels[1:]:
+            # If this level is close to the last one we kept, skip it
+            if abs(level - simplified_levels[-1]) / level < 0.0005:  # Within 0.05%
+                continue
+            simplified_levels.append(level)
+        
+        levels = simplified_levels
+    
+    # Return top n_levels
+    return levels[:n_levels]
+```
+
+### 7. Complete Implementation
+
+Now let's put it all together with a main function:
+
+```python
+def main():
+    """Main entry point for the CRT trading agent."""
+    try:
+        # Configuration
+        symbol = "EURUSD"
+        higher_timeframe = mt5.TIMEFRAME_H4  # 4-hour timeframe for CRT patterns
+        lower_timeframe = mt5.TIMEFRAME_M15  # 15-minute timeframe for entries
+        risk_percent = 1.0  # Risk 1% per trade
+        max_trades = 3  # Maximum 3 concurrent trades
+        check_interval = 300  # Check every 5 minutes
+        backtest_mode = False  # Set to True for backtesting
+        
+        print("=== CRT Trading Agent ===")
+        print(f"Symbol: {symbol}")
+        print(f"Risk per trade: {risk_percent}%")
+        print(f"Maximum concurrent trades: {max_trades}")
+        
+        # Run the agent
+        run_crt_trading_agent(
+            symbol=symbol,
+            higher_tf=higher_timeframe,
+            lower_tf=lower_timeframe,
+            risk_percent=risk_percent,
+            max_trades=max_trades,
+            check_interval=check_interval,
+            backtest_mode=backtest_mode
+        )
+    
+    except Exception as e:
+        print(f"Error in main function: {e}")
+        if mt5.initialize():
+            mt5.shutdown()
+
+if __name__ == "__main__":
+    main()
+```
+
+## Strategy Refinements Based on ICT Concepts
+
+From the video and documentation, here are some advanced ICT concepts you can add to enhance trading agent:
+
+### 1. Time-Based Analysis (Killzones)
+
+Add a function to check if the current time falls within predefined "killzone" windows where high-probability trading opportunities are more likely:
+
+```python
+def is_in_killzone():
+    """Check if current time is in a high-probability trading window (killzone)."""
+    current_time = datetime.now()
+    
+    # Convert to Eastern Standard Time (market standard)
+    # Note: This is simplified - proper implementation would use pytz
+    
+    hour = current_time.hour
+    
+    # London Open Killzone (2-5 AM EST)
+    if 2 <= hour < 5:
+        return True, "London Open"
+    
+    # New York Open Killzone (8-11 AM EST)
+    if 8 <= hour < 11:
+        return True, "New York Open"
+    
+    # London Close Killzone (11 AM - 12 PM EST)
+    if 11 <= hour < 12:
+        return True, "London Close"
+    
+    return False, None
+```
+
+### 2. Order Block Identification
+
+Add a function to identify order blocks (last down candle before an up move or last up candle before a down move):
+
+```python
+def find_order_blocks(df, structure):
+    """
+    Identify potential order blocks in the price data.
+    
+    Parameters:
+    - df: DataFrame with OHLC data
+    - structure: Market structure from analyze_market_structure()
+    
+    Returns:
+    - Dictionary of bullish and bearish order blocks
+    """
+    order_blocks = {
+        'bullish': [],
+        'bearish': []
+    }
+    
+    df_reset = df.reset_index()
+    
+    # Find bullish order blocks (last down candle before up move)
+    for i in range(3, len(df_reset)-1):
+        # Check for up move
+        if (df_reset.iloc[i]['close'] > df_reset.iloc[i]['open'] and 
+            df_reset.iloc[i-1]['close'] < df_reset.iloc[i-1]['open'] and
+            df_reset.iloc[i]['low'] > df_reset.iloc[i-1]['low']):
+            
+            # This could be a bullish order block
+            order_blocks['bullish'].append({
+                'time': df_reset.iloc[i-1]['time'],
+                'high': df_reset.iloc[i-1]['high'],
+                'low': df_reset.iloc[i-1]['low'],
+                'open': df_reset.iloc[i-1]['open'],
+                'close': df_reset.iloc[i-1]['close']
+            })
+    
+    # Find bearish order blocks (last up candle before down move)
+    for i in range(3, len(df_reset)-1):
+        # Check for down move
+        if (df_reset.iloc[i]['close'] < df_reset.iloc[i]['open'] and 
+            df_reset.iloc[i-1]['close'] > df_reset.iloc[i-1]['open'] and
+            df_reset.iloc[i]['high'] < df_reset.iloc[i-1]['high']):
+            
+            # This could be a bearish order block
+            order_blocks['bearish'].append({
+                'time': df_reset.iloc[i-1]['time'],
+                'high': df_reset.iloc[i-1]['high'],
+                'low': df_reset.iloc[i-1]['low'],
+                'open': df_reset.iloc[i-1]['open'],
+                'close': df_reset.iloc[i-1]['close']
+            })
+    
+    return order_blocks
+```
+
+### 3. Fair Value Gap (FVG) Detection
+
+Add a function to identify Fair Value Gaps (imbalances in price action):
+
+```python
+def find_fair_value_gaps(df):
+    """
+    Identify Fair Value Gaps (FVGs) in the price data.
+    
+    Parameters:
+    - df: DataFrame with OHLC data
+    
+    Returns:
+    - Dictionary of bullish and bearish FVGs
+    """
+    fvgs = {
+        'bullish': [],
+        'bearish': []
+    }
+    
+    df_reset = df.reset_index()
+    
+    # Find bullish FVGs (low of candle 1 > high of candle 3)
+    for i in range(2, len(df_reset)-1):
+        if df_reset.iloc[i-2]['low'] > df_reset.iloc[i]['high']:
+            fvgs['bullish'].append({
+                'start_time': df_reset.iloc[i-2]['time'],
+                'end_time': df_reset.iloc[i]['time'],
+                'top': df_reset.iloc[i-2]['low'],
+                'bottom': df_reset.iloc[i]['high']
+            })
+    
+    # Find bearish FVGs (high of candle 1 < low of candle 3)
+    for i in range(2, len(df_reset)-1):
+        if df_reset.iloc[i-2]['high'] < df_reset.iloc[i]['low']:
+            fvgs['bearish'].append({
+                'start_time': df_reset.iloc[i-2]['time'],
+                'end_time': df_reset.iloc[i]['time'],
+                'top': df_reset.iloc[i]['low'],
+                'bottom': df_reset.iloc[i-2]['high']
+            })
+    
+    return fvgs
+```
+
+## Implementation Recommendations
+
+1. **Start with a simplified version**: Begin by implementing the core MT5 connection, data retrieval, and basic CRT pattern identification.
+
+2. **Test in demo mode**: we want trading agent to be tested on a demo account before risking real money.
+
+3. **Implement proper risk management**: Limit risk per trade to 1-2% of your account balance.
+
+4. **Use appropriate timeframes**: The typical timeframe alignment from the video suggests:
+   - Higher timeframe (H4/Daily): For CRT pattern identification
+   - Lower timeframe (M15/M5): For precise entries
+
+5. **Add filters**: Incorporate filters like market structure analysis, proximity to key levels, and killzone timing to improve trade quality.
+
+6. **Add logging**: Implement comprehensive logging to track decisions and performance.
+
+7. **Monitor and refine**: Regularly review the agent's performance and refine the strategy based on results.
+
+## Conclusion
+
+Building a Python trading agent for MT5 based on CRT/ICT concepts is a substantial project that combines technical analysis with algorithmic execution and machine learning. The code is an examples] provided give you a framework to start with, but successful implementation will require ongoing testing and refinement.
+
+Remember that no trading strategy guarantees success, and you should implement machine learning and algorithmic trading with appropriate risk management and realistic expectations. The goal should be to develop a system that provides a statistical edge over many trades, rather than seeking perfect predictions for individual setups.
+
+# CRT (Candle Range Theory) Trading Strategy Implementation
+# Based on ICT Smart Money Concepts
+
+import datetime
+import random
+from typing import List, Dict, Tuple, Optional
+
+# Define a simple Candle class to represent price data
+class Candle:
+    def __init__(self, time, open_price, high, low, close):
+        self.time = time
+        self.open = open_price
+        self.high = high
+        self.low = low
+        self.close = close
+
+    def __str__(self):
+        return f"[{self.time.strftime('%Y-%m-%d %H:%M')}] O: {self.open:.5f}, H: {self.high:.5f}, L: {self.low:.5f}, C: {self.close:.5f}"
+
+# Define a class to represent a CRT pattern
+class CRTPattern:
+    def __init__(self, range_candle, manipulation_candle, distribution_candle=None, pattern_type=None):
+        self.range_candle = range_candle  # First candle that establishes the range
+        self.manipulation_candle = manipulation_candle  # Second candle that manipulates the range
+        self.distribution_candle = distribution_candle  # Third candle that makes the expansion
+        self.pattern_type = pattern_type  # BULLISH or BEARISH
+        self.entry_price = None
+        self.stop_loss = None
+        self.take_profit = None
+        self.risk_reward = None
+        
+        # Calculate entry, stop loss, and take profit levels
+        self.calculate_trade_levels()
+    
+    def calculate_trade_levels(self):
+        """Calculate entry, stop loss, and take profit levels based on the CRT pattern"""
+        if self.pattern_type == "BULLISH":
+            # For bullish pattern:
+            # Entry: At the low of the manipulation candle (where price grabbed liquidity)
+            # Stop Loss: Just below the entry (can be adjusted based on volatility)
+            # Take Profit: At the high of the range candle (targeting opposing end of range)
+            self.entry_price = self.manipulation_candle.low
+            # Set stop loss 45 pips below entry
+            self.stop_loss = self.entry_price - 0.00045  
+            self.take_profit = self.range_candle.high
+            
+        elif self.pattern_type == "BEARISH":
+            # For bearish pattern:
+            # Entry: At the high of the manipulation candle (where price grabbed liquidity)
+            # Stop Loss: Just above the entry (can be adjusted based on volatility)
+            # Take Profit: At the low of the range candle (targeting opposing end of range)
+            self.entry_price = self.manipulation_candle.high
+            # Set stop loss 45 pips above entry
+            self.stop_loss = self.entry_price + 0.00045
+            self.take_profit = self.range_candle.low
+        
+        # Calculate risk-reward ratio
+        if self.stop_loss and self.take_profit and self.entry_price:
+            risk = abs(self.entry_price - self.stop_loss)
+            reward = abs(self.entry_price - self.take_profit)
+            self.risk_reward = reward / risk if risk > 0 else 0
+    
+    def __str__(self):
+        return (
+            f"Pattern Type: {self.pattern_type}\n"
+            f"Range Candle: {self.range_candle}\n"
+            f"Manipulation Candle: {self.manipulation_candle}\n"
+            f"Distribution Candle: {self.distribution_candle if self.distribution_candle else 'N/A'}\n"
+            f"Entry Price: {self.entry_price:.5f}\n"
+            f"Stop Loss: {self.stop_loss:.5f}\n"
+            f"Take Profit: {self.take_profit:.5f}\n"
+            f"Risk-Reward Ratio: 1:{self.risk_reward:.2f}"
+        )
+
+# Function to identify CRT patterns in a list of candles
+def identify_crt_patterns(candles: List[Candle]) -> List[CRTPattern]:
+    """
+    Identify Candle Range Theory (CRT) patterns in a series of candles.
+    
+    A CRT pattern consists of three candles:
+    1. Range Candle: Establishes the range
+    2. Manipulation Candle: Manipulates by purging one side of the range
+    3. Distribution Candle: Expands toward the opposing end of the range
+    """
+    patterns = []
+    
+    # We need at least 3 candles to identify a complete CRT pattern
+    if len(candles) < 3:
+        return patterns
+    
+    # Analyze each potential CRT setup (need 3 consecutive candles)
+    for i in range(len(candles) - 2):
+        range_candle = candles[i]
+        manipulation_candle = candles[i + 1]
+        distribution_candle = candles[i + 2]
+        
+        # Check for BULLISH CRT pattern:
+        # 1. Manipulation candle breaks below the range candle's low (purges liquidity)
+        # 2. Manipulation candle closes inside the range (preferred) or near it
+        # 3. Distribution candle moves toward the opposing end (high of range candle)
+        if (manipulation_candle.low < range_candle.low and 
+            distribution_candle.close > manipulation_candle.close):
+            
+            pattern = CRTPattern(
+                range_candle,
+                manipulation_candle,
+                distribution_candle,
+                "BULLISH"
+            )
+            patterns.append(pattern)
+        
+        # Check for BEARISH CRT pattern:
+        # 1. Manipulation candle breaks above the range candle's high (purges liquidity)
+        # 2. Manipulation candle closes inside the range (preferred) or near it
+        # 3. Distribution candle moves toward the opposing end (low of range candle)
+        elif (manipulation_candle.high > range_candle.high and 
+              distribution_candle.close < manipulation_candle.close):
+            
+            pattern = CRTPattern(
+                range_candle,
+                manipulation_candle,
+                distribution_candle,
+                "BEARISH"
+            )
+            patterns.append(pattern)
+    
+    return patterns
+
+# Function to simulate trade execution based on a CRT pattern
+def execute_trade(pattern: CRTPattern, account_balance: float, risk_percent: float = 2.0) -> Dict:
+    """
+    Simulate trade execution based on the CRT pattern.
+    Returns trade details including profit/loss calculation.
+    """
+    # Calculate position size based on risk
+    risk_amount = account_balance * (risk_percent / 100)
+    risk_pips = abs(pattern.entry_price - pattern.stop_loss) * 10000  # Convert to pips (4 decimal places)
+    position_size = risk_amount / risk_pips if risk_pips > 0 else 0
+    
+    # Simulate a simple outcome (this would be based on future price action in a real system)
+    # For demonstration, we'll use a random outcome but weighted by the risk-reward ratio
+    probability_of_success = min(75, 35 + (pattern.risk_reward * 5))  # Higher RR = higher probability (capped at 75%)
+    
+    # Generate a random number to determine if the trade is successful
+    is_successful = random.randint(1, 100) <= probability_of_success
+    
+    # Calculate profit or loss
+    if is_successful:
+        exit_price = pattern.take_profit
+        exit_type = "take_profit"
+        pip_gain = abs(pattern.take_profit - pattern.entry_price) * 10000
+        profit_loss = position_size * pip_gain
+    else:
+        exit_price = pattern.stop_loss
+        exit_type = "stop_loss"
+        profit_loss = -risk_amount
+    
+    # Return trade details
+    return {
+        "pattern_type": pattern.pattern_type,
+        "entry_price": pattern.entry_price,
+        "exit_price": exit_price,
+        "stop_loss": pattern.stop_loss,
+        "take_profit": pattern.take_profit,
+        "position_size": position_size,
+        "risk_amount": risk_amount,
+        "exit_type": exit_type,
+        "profit_loss": profit_loss,
+        "success": is_successful
+    }
+
+# Function to create pre-defined candle patterns for demonstration
+def create_predefined_patterns() -> List[Candle]:
+    """
+    Create pre-defined candlestick data that clearly demonstrates CRT patterns.
+    Returns a list of candles with deliberate CRT setups.
+    """
+    # Set base time for candles
+    base_time = datetime.datetime(2023, 1, 1, 0, 0)
+    interval = datetime.timedelta(hours=4)  # H4 candles
+    
+    # Create a list to hold our candles
+    candles = []
+
+    # ----------------------------------------------------------------
+    # PATTERN 1: BULLISH CRT EXAMPLE
+    # ----------------------------------------------------------------
+    print("Creating BULLISH CRT Pattern Example:")
+    print("1. Range Candle: Forms the initial range")
+    
+    # Day 1: Range candle - Sets up the initial range
+    candles.append(Candle(
+        base_time,
+        open_price=1.0500,
+        high=1.0550,
+        low=1.0450,
+        close=1.0480
+    ))
+    base_time += interval
+    
+    print("2. Manipulation Candle: Breaks below the range candle's low to purge liquidity")
+    
+    # Day 1 + 4h: Manipulation candle - Breaks below the range low (liquidity grab)
+    candles.append(Candle(
+        base_time,
+        open_price=1.0470,
+        high=1.0490,
+        low=1.0420,  # Breaks below the range candle's low
+        close=1.0460  # Closes back inside the range
+    ))
+    base_time += interval
+    
+    print("3. Distribution Candle: Moves up toward the opposing end of the range")
+    
+    # Day 1 + 8h: Distribution candle - Moves up to the opposing end
+    candles.append(Candle(
+        base_time,
+        open_price=1.0465,
+        high=1.0540,
+        low=1.0455,
+        close=1.0530  # Closes near the high of the range
+    ))
+    base_time += interval
+    
+    # Add a few more candles to separate patterns
+    for i in range(3):
+        candles.append(Candle(
+            base_time,
+            open_price=1.0530 - (i * 0.0010),
+            high=1.0550 - (i * 0.0010),
+            low=1.0510 - (i * 0.0010),
+            close=1.0520 - (i * 0.0010)
+        ))
+        base_time += interval
+    
+    # ----------------------------------------------------------------
+    # PATTERN 2: BEARISH CRT EXAMPLE
+    # ----------------------------------------------------------------
+    print("\nCreating BEARISH CRT Pattern Example:")
+    print("1. Range Candle: Forms the initial range")
+    
+    # Day 3: Range candle - Sets up the initial range
+    candles.append(Candle(
+        base_time,
+        open_price=1.0480,
+        high=1.0520,
+        low=1.0450,
+        close=1.0490
+    ))
+    base_time += interval
+    
+    print("2. Manipulation Candle: Breaks above the range candle's high to purge liquidity")
+    
+    # Day 3 + 4h: Manipulation candle - Breaks above the range high (liquidity grab)
+    candles.append(Candle(
+        base_time,
+        open_price=1.0495,
+        high=1.0550,  # Breaks above the range candle's high
+        low=1.0480,
+        close=1.0485  # Closes back inside the range
+    ))
+    base_time += interval
+    
+    print("3. Distribution Candle: Moves down toward the opposing end of the range")
+    
+    # Day 3 + 8h: Distribution candle - Moves down to the opposing end
+    candles.append(Candle(
+        base_time,
+        open_price=1.0480,
+        high=1.0490,
+        low=1.0440,
+        close=1.0445  # Closes near the low of the range
+    ))
+    base_time += interval
+    
+    return candles
+
+# Main function to demonstrate the CRT strategy
+def main():
+    print("=" * 80)
+    print("CRT (Candle Range Theory) Trading Strategy Demonstration")
+    print("Based on ICT Smart Money Concepts")
+    print("=" * 80)
+    
+    # Create predefined candle patterns
+    print("\nGenerating predefined candle patterns with clear CRT setups...")
+    candles = create_predefined_patterns()
+    
+    # Print the candle data for reference
+    print("\nCandle Data:")
+    print("-" * 80)
+    for i, candle in enumerate(candles):
+        print(f"Candle {i+1}: {candle}")
+    
+    # Identify CRT patterns
+    print("\nIdentifying CRT patterns in the data...")
+    patterns = identify_crt_patterns(candles)
+    
+    # Display identified patterns
+    print("\nIdentified CRT Patterns:")
+    print("-" * 80)
+    if not patterns:
+        print("No patterns found.")
+    else:
+        for i, pattern in enumerate(patterns):
+            print(f"Pattern {i+1}:")
+            print(pattern)
+            print()
+    
+    # Simulate trade execution
+    print("\nSimulating trade execution for identified patterns...")
+    print("-" * 80)
+    
+    account_balance = 10000.00  # Starting with $10,000
+    risk_percent = 2.0          # Risk 2% per trade
+    
+    for i, pattern in enumerate(patterns):
+        print(f"Executing trade for Pattern {i+1} ({pattern.pattern_type}):")
+        
+        # Execute the trade
+        trade_result = execute_trade(pattern, account_balance, risk_percent)
+        
+        # Update account balance
+        account_balance += trade_result["profit_loss"]
+        
+        # Print trade details
+        print(f"  Entry Price: {trade_result['entry_price']:.5f}")
+        print(f"  Stop Loss: {trade_result['stop_loss']:.5f}")
+        print(f"  Take Profit: {trade_result['take_profit']:.5f}")
+        print(f"  Risk Amount: ${trade_result['risk_amount']:.2f}")
+        print(f"  Risk-Reward Ratio: 1:{pattern.risk_reward:.2f}")
+        print(f"  Exit Type: {trade_result['exit_type']}")
+        print(f"  Exit Price: {trade_result['exit_price']:.5f}")
+        print(f"  Profit/Loss: ${trade_result['profit_loss']:.2f}")
+        print(f"  New Account Balance: ${account_balance:.2f}")
+        print()
+    
+    # Summary
+    print("=" * 80)
+    print("CRT Strategy Summary:")
+    print("-" * 80)
+    print(f"Starting Balance: $10,000.00")
+    print(f"Final Balance: ${account_balance:.2f}")
+    
+    # Important CRT strategy takeaways
+    print("\nCRT Strategy Key Takeaways:")
+    print("-" * 80)
+    print("1. CRT is based on identifying a 3-candle sequence:")
+    print("   - Range Candle: Establishes the trading range")
+    print("   - Manipulation Candle: Purges liquidity at one end of the range")
+    print("   - Distribution Candle: Moves toward the opposing end of the range")
+    print()
+    print("2. The strategy works best at key support/resistance levels and during specific market sessions")
+    print()
+    print("3. For BULLISH CRT:")
+    print("   - Look for price breaking below the range candle's low")
+    print("   - Enter long when the manipulation candle closes back inside the range")
+    print("   - Target the high of the range candle")
+    print()
+    print("4. For BEARISH CRT:")
+    print("   - Look for price breaking above the range candle's high")
+    print("   - Enter short when the manipulation candle closes back inside the range")
+    print("   - Target the low of the range candle")
+    print()
+    print("5. The most effective CRT patterns:")
+    print("   - Form at key market levels (support/resistance)")
+    print("   - Occur during high-volume trading sessions (ICT 'kill zones')")
+    print("   - Have clear liquidity grabs (turtle soups)")
+    print("   - Show a change of character in price action after the manipulation")
+    print()
+    print("6. Risk Management is crucial:")
+    print("   - Place stop loss beyond the manipulation candle's extreme")
+    print("   - Maintain a favorable risk-reward ratio (ideally 1:2 or better)")
+    print("   - Limit risk per trade to 1-2% of account balance")
+
+if __name__ == "__main__":
+    main()

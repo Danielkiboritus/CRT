@@ -1,0 +1,7 @@
+EURUSD
+GBPUSD
+USDJPY
+Volatility 10 Index
+Volatility 25 Index
+Jump 25 Index
+Jump 50 Index
