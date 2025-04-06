@@ -10,19 +10,19 @@ import logging
 # Demo Account Options - Uncomment the account you want to use
 
 # Deriv-Demo Account 1
-# MT5_LOGIN = 5715737             # Deriv-Demo account number 1
-# MT5_PASSWORD = "189@Kab@rNet@189"   # Deriv-Demo password 1
-# MT5_SERVER = "Deriv-Demo" # Deriv-Demo server
+# MT5_LOGIN =              # Deriv-Demo account number 1
+# MT5_PASSWORD = ""   # Deriv-Demo password 1
+# MT5_SERVER = "" # Deriv-Demo server
 
 # Deriv-Demo Account 2
-MT5_LOGIN = 31819922            # Deriv-Demo account number 2
-MT5_PASSWORD = "189@Kab@rNet@189"   # Deriv-Demo password 2
-MT5_SERVER = "Deriv-Demo" # Deriv-Demo server
+MT5_LOGIN =             # Deriv-Demo account number 2
+MT5_PASSWORD = ""   # Deriv-Demo password 2
+MT5_SERVER = "" # Deriv-Demo server
 
 # FBS-Demo Account
-# MT5_LOGIN = 101310805             # FBS-Demo account number
-# MT5_PASSWORD = "[lt5z@UJ"   # FBS-Demo password
-# MT5_SERVER = "FBS-Demo" # FBS-Demo server
+# MT5_LOGIN =              # FBS-Demo account number
+# MT5_PASSWORD = ""   # FBS-Demo password
+# MT5_SERVER = "" # FBS-Demo server
 
 # --- MT5 Installation ---
 # Optional: Specify the full path to the MT5 terminal executable
