@@ -39,3 +39,9 @@ ENV/
 # OS specific
 .DS_Store
 Thumbs.db
+
+# Sensitive information
+MT5_LOGIN*
+*.key
+*.pem
+*.env
